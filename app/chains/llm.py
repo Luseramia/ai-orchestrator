@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
-from langchain_ollama import ChatOllama
+
+from app.chains.codex_adapter import call_codex
 
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
@@ -27,7 +27,9 @@ def _required_env(name: str) -> str:
     return value
 
 
-def get_main_llm() -> ChatOpenAI:
+def get_main_llm() -> Any:
+    from langchain_openai import ChatOpenAI
+
     return ChatOpenAI(
         model=os.getenv("MAIN_MODEL", DEFAULT_MAIN_MODEL),
         base_url=os.getenv("OPENROUTER_BASE_URL", DEFAULT_OPENROUTER_BASE_URL),
@@ -36,10 +38,17 @@ def get_main_llm() -> ChatOpenAI:
     )
 
 
-def get_main_ollama_llm():
+def get_main_ollama_llm() -> Any:
+    try:
+        from langchain_ollama import ChatOllama
+    except ImportError as exc:
+        raise RuntimeError(
+            "LLM_PROVIDER=ollama requires the langchain-ollama package."
+        ) from exc
+
     return ChatOllama(
-        model=DEFAULT_MAIN_OLLAMA_MODEL,
-        base_url=DEFAULT_OLLAMA_BASE_URL,  # default ollama
+        model=os.getenv("OLLAMA_MODEL", DEFAULT_MAIN_OLLAMA_MODEL),
+        base_url=os.getenv("OLLAMA_BASE_URL", DEFAULT_OLLAMA_BASE_URL),
         temperature=0.2,
     )
 
@@ -51,8 +60,21 @@ def _message_content_to_text(content: Any) -> str:
 
 
 async def call_main_model(prompt: str) -> str:
+    provider = os.getenv("LLM_PROVIDER", "ollama").strip().lower()
+
     try:
-        message = await get_main_ollama_llm().ainvoke(prompt)
+        if provider == "codex":
+            return await call_codex(prompt)
+
+        if provider == "openrouter":
+            message = await get_main_llm().ainvoke(prompt)
+        elif provider == "ollama":
+            message = await get_main_ollama_llm().ainvoke(prompt)
+        else:
+            raise RuntimeError(
+                f"Unsupported LLM_PROVIDER '{provider}'. Use codex, openrouter, or ollama."
+            )
+
         return _message_content_to_text(getattr(message, "content", message))
     except Exception as exc:
-        raise RuntimeError(f"Failed to call OpenRouter: {exc}") from exc
+        raise RuntimeError(f"Failed to call {provider}: {exc}") from exc

@@ -224,5 +224,4 @@ async def generate_user_story_artifacts(
 
     graph = build_user_story_graph()
     final_state = await graph.ainvoke(initial_state)
-    print('final_state',final_state)
     return _to_generation_response(final_state["result"])

@@ -3,5 +3,7 @@ uvicorn
 langgraph
 langchain
 langchain-openai
+langchain-ollama
 pydantic
 python-dotenv
+httpx>=0.27,<1
