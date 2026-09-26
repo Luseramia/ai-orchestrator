@@ -121,6 +121,56 @@ class FinancialStatementNormalizationTests(unittest.IsolatedAsyncioTestCase):
         self.assertLess(response.rows[0].confidence, 0.70)
         self.assertEqual(len(response.rows), 1)
 
+    async def test_split_balance_sheet_keeps_the_verified_accounting_equation(self):
+        request = FinancialNormalizationRequest(
+            fileName="ptt-financial-statements.xlsx",
+            preferredScope="CONSOLIDATED",
+            currencyHint="THB",
+            unitHint="ONES",
+            sheets=[
+                {"name": "BS-Asset", "rows": [["รวมสินทรัพย์", 3522489795835, 3269659977907]]},
+                {"name": "BS-Liability", "rows": [["รวมหนี้สิน", 1742218477667, 1617176367612]]},
+                {"name": "BS-Equity", "rows": [["รวมส่วนของผู้ถือหุ้น", 1780271318168, 1652483610295]]},
+            ],
+        )
+        model_rows = []
+        for sheet, label, code in [
+            ("BS-Asset", "รวมสินทรัพย์", "ASSET.TOTAL"),
+            ("BS-Liability", "รวมหนี้สิน", "LIABILITY.TOTAL"),
+            ("BS-Equity", "รวมส่วนของผู้ถือหุ้น", "EQUITY.TOTAL"),
+        ]:
+            model_rows.append({
+                "originalLabel": label,
+                "canonicalCode": code,
+                "confidence": 0.99,
+                "sourceSheet": sheet,
+                "sourceRow": 1,
+                "values": [
+                    {"periodEnd": "2026-06-30", "value": 0, "sourceColumn": 2},
+                    {"periodEnd": "2025-12-31", "value": 0, "sourceColumn": 3},
+                ],
+            })
+        output = {
+            "scope": "CONSOLIDATED",
+            "currency": "THB",
+            "unit": "ONES",
+            "rows": model_rows,
+        }
+        with patch(
+            "app.graphs.financial_statement_graph.call_main_model",
+            new_callable=AsyncMock,
+            return_value=json.dumps(output, ensure_ascii=False),
+        ):
+            response = await normalize_financial_statement(request)
+
+        by_code = {row.canonicalCode: row for row in response.rows}
+        for value_index in (0, 1):
+            assets = by_code["ASSET.TOTAL"].values[value_index].value
+            liabilities = by_code["LIABILITY.TOTAL"].values[value_index].value
+            equity = by_code["EQUITY.TOTAL"].values[value_index].value
+            self.assertEqual(assets, liabilities + equity)
+        self.assertEqual(response.unit, "ONES")
+
 
 if __name__ == "__main__":
     unittest.main()
