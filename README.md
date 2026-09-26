@@ -169,6 +169,11 @@ Example request:
 }
 ```
 
+`POST /financial-analysis/summarize` accepts only the verified metrics, growth,
+directions, and rule-engine signals calculated by the backend. It returns Thai
+explanatory prose plus whitelisted `evidenceKeys`; it never receives raw workbook
+rows and must not provide investment recommendations.
+
 ```bash
 curl -X POST http://127.0.0.1:8001/generate \
   -H "Content-Type: application/json" \

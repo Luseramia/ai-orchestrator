@@ -9,6 +9,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.graphs.user_story_graph import generate_user_story_artifacts
 from app.graphs.financial_statement_graph import normalize_financial_statement
+from app.graphs.financial_analysis_graph import summarize_financial_analysis
+from app.schemas.financial_analysis import (
+    FinancialAnalysisSummaryRequest,
+    FinancialAnalysisSummaryResponse,
+)
 from app.schemas.financial_statement import (
     FinancialNormalizationRequest,
     FinancialNormalizationResponse,
@@ -71,6 +76,25 @@ async def normalize_statement(
             unit=request.unitHint or "ONES",
             rows=[],
             warnings=[f"Financial statement normalization failed: {exc}"],
+            requiresHumanReview=True,
+        )
+
+
+@app.post(
+    "/financial-analysis/summarize",
+    response_model=FinancialAnalysisSummaryResponse,
+)
+async def summarize_analysis(
+    request: FinancialAnalysisSummaryRequest,
+) -> FinancialAnalysisSummaryResponse:
+    try:
+        return await summarize_financial_analysis(request)
+    except Exception as exc:
+        return FinancialAnalysisSummaryResponse(
+            status="FAILED",
+            summaryMarkdown=request.deterministicSummary,
+            evidenceKeys=[],
+            warnings=[f"Financial analysis summary failed: {exc}"],
             requiresHumanReview=True,
         )
 
