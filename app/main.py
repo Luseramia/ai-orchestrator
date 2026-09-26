@@ -8,6 +8,11 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.graphs.user_story_graph import generate_user_story_artifacts
+from app.graphs.financial_statement_graph import normalize_financial_statement
+from app.schemas.financial_statement import (
+    FinancialNormalizationRequest,
+    FinancialNormalizationResponse,
+)
 from app.schemas.sdlc import GenerationRequest, GenerationResponse
 
 load_dotenv()
@@ -45,6 +50,27 @@ async def generate(request: GenerationRequest) -> GenerationResponse:
             status="FAILED",
             artifacts=[],
             warnings=[f"Artifact generation failed: {exc}"],
+            requiresHumanReview=True,
+        )
+
+
+@app.post(
+    "/financial-statements/normalize",
+    response_model=FinancialNormalizationResponse,
+)
+async def normalize_statement(
+    request: FinancialNormalizationRequest,
+) -> FinancialNormalizationResponse:
+    try:
+        return await normalize_financial_statement(request)
+    except Exception as exc:
+        return FinancialNormalizationResponse(
+            status="FAILED",
+            scope=request.preferredScope,
+            currency=(request.currencyHint or "THB").upper(),
+            unit=request.unitHint or "ONES",
+            rows=[],
+            warnings=[f"Financial statement normalization failed: {exc}"],
             requiresHumanReview=True,
         )
 

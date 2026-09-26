@@ -134,6 +134,41 @@ Then send the example request below. The `/generate` response is produced throug
 
 Only `sourceType=USER_STORY` is supported in this MVP.
 
+## Normalize Financial Statements
+
+`POST /financial-statements/normalize` converts multi-sheet balance-sheet data
+into the shared financial import schema. The caller sends workbook cells as JSON
+and chooses `CONSOLIDATED` or `SEPARATE`. The model identifies the layout,
+periods, and canonical accounts; the service then reads every numeric value back
+from its declared source cell before returning it. Unverifiable rows are dropped
+and the response always requires human review.
+
+The endpoint does not require a caller API key. When running the caller locally,
+port-forward this service and use `http://127.0.0.1:18000`. The orchestrator's
+credential for the Codex gateway remains inside Kubernetes and is never sent by
+the browser or backend caller.
+
+Example request:
+
+```json
+{
+  "fileName": "financial-statements.xlsx",
+  "statementType": "BALANCE_SHEET",
+  "preferredScope": "CONSOLIDATED",
+  "currencyHint": "THB",
+  "unitHint": "THOUSAND",
+  "sheets": [
+    {
+      "name": "BS-Asset",
+      "rows": [
+        ["รายการ", "30 มิถุนายน 2569"],
+        ["เงินสดและรายการเทียบเท่าเงินสด", 1250]
+      ]
+    }
+  ]
+}
+```
+
 ```bash
 curl -X POST http://127.0.0.1:8001/generate \
   -H "Content-Type: application/json" \
